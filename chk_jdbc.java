@@ -13,7 +13,7 @@ public class chk_jdbc {
     
     // BigQuery connection parameters - modify these according to your setup
     private static final String DB_URL = "jdbc:bigquery://https://private.googleapis.com/bigquery/v2:443;ProjectId=tnn-sb-to970548-1;DefaultDataset=your_dataset";
-    private static final String CREDENTIAL_FILE_PATH = "/path/to/wif-credentials.json";
+    private static final String CREDENTIAL_FILE_PATH = "/opt/denodo/work/eloi_work/wif-credentials.json";
     private static final String SERVICE_ACCOUNT_TOKEN_FILE = "/var/run/service-account/token";
     private static final String BIGQUERY_DRIVER_PATH = "/opt/denodo/lib/extensions/jdbc-drivers-external/bigquery";
     
@@ -58,6 +58,30 @@ public class chk_jdbc {
     }
     
     /**
+     * Validate that required credential files exist and are readable
+     */
+    private static void validateCredentialFiles() throws Exception {
+        // Check WIF credential file
+        File credFile = new File(CREDENTIAL_FILE_PATH);
+        if (!credFile.exists()) {
+            throw new Exception("WIF credential file not found: " + CREDENTIAL_FILE_PATH);
+        }
+        if (!credFile.canRead()) {
+            throw new Exception("WIF credential file not readable: " + CREDENTIAL_FILE_PATH);
+        }
+        System.out.println("✓ WIF credential file found: " + CREDENTIAL_FILE_PATH);
+        
+        // Check service account token file
+        File tokenFile = new File(SERVICE_ACCOUNT_TOKEN_FILE);
+        if (!tokenFile.exists()) {
+            System.out.println("⚠ Warning: Service account token file not found: " + SERVICE_ACCOUNT_TOKEN_FILE);
+            System.out.println("  This may be normal if running outside Kubernetes");
+        } else {
+            System.out.println("✓ Service account token file found: " + SERVICE_ACCOUNT_TOKEN_FILE);
+        }
+    }
+    
+    /**
      * Tests JDBC connection to BigQuery using WIF authentication
      */
     public static void testBigQueryJdbcConnection() {
@@ -74,6 +98,9 @@ public class chk_jdbc {
             if (driverClassLoader == null) {
                 throw new Exception("Failed to load BigQuery drivers");
             }
+            
+            // Validate credential files before attempting connection
+            validateCredentialFiles();
             
             // Set up connection properties for WIF authentication
             Properties props = new Properties();
