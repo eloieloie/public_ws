@@ -18,8 +18,21 @@ public class chk_jdbc {
     private static final String BIGQUERY_DRIVER_PATH = "/opt/denodo/lib/extensions/jdbc-drivers-external/bigquery";
     
     public static void main(String[] args) {
-        // Set environment variable before any Google libraries are loaded
-        System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", "/opt/denodo/work/eloi_work/wif-credentials.json");
+        try {
+            // Set the environment variable at OS level using ProcessBuilder
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.environment().put("GOOGLE_APPLICATION_CREDENTIALS", "/opt/denodo/work/eloi_work/wif-credentials.json");
+            
+            // Also set as system property
+            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", "/opt/denodo/work/eloi_work/wif-credentials.json");
+            
+            System.out.println("Environment variables set:");
+            System.out.println("  GOOGLE_APPLICATION_CREDENTIALS (system property): " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
+            System.out.println("  GOOGLE_APPLICATION_CREDENTIALS (env var): " + pb.environment().get("GOOGLE_APPLICATION_CREDENTIALS"));
+            
+        } catch (Exception e) {
+            System.out.println("Warning: Could not set environment variable: " + e.getMessage());
+        }
         
         testBigQueryJdbcConnection();
     }
@@ -115,6 +128,112 @@ public class chk_jdbc {
             System.out.println("  This may be normal if running outside Kubernetes");
         } else {
             System.out.println("✓ Service account token file found: " + SERVICE_ACCOUNT_TOKEN_FILE);
+        }
+    }
+    
+    /**
+     * Try multiple authentication methods
+     */
+    private static void tryMultipleAuthMethods(URLClassLoader driverClassLoader) throws Exception {
+        Connection connection = null;
+        
+        // Method 1: ADC with External Account
+        try {
+            System.out.println("\n=== Attempting Method 1: ADC with External Account ===");
+            connection = tryADCAuth(driverClassLoader);
+            if (connection != null) {
+                System.out.println("✓ Method 1 succeeded!");
+                testConnection(connection);
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("✗ Method 1 failed: " + e.getMessage());
+        }
+        
+        // Method 2: Service Account Key approach
+        try {
+            System.out.println("\n=== Attempting Method 2: Service Account Key ===");
+            connection = tryServiceAccountAuth(driverClassLoader);
+            if (connection != null) {
+                System.out.println("✓ Method 2 succeeded!");
+                testConnection(connection);
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("✗ Method 2 failed: " + e.getMessage());
+        }
+        
+        // Method 3: Direct OAuth Token (if we can get one)
+        try {
+            System.out.println("\n=== Attempting Method 3: Manual Token ===");
+            connection = tryManualTokenAuth(driverClassLoader);
+            if (connection != null) {
+                System.out.println("✓ Method 3 succeeded!");
+                testConnection(connection);
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("✗ Method 3 failed: " + e.getMessage());
+        }
+        
+        throw new Exception("All authentication methods failed");
+    }
+    
+    private static Connection tryADCAuth(URLClassLoader driverClassLoader) throws Exception {
+        System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
+        
+        Properties props = new Properties();
+        props.setProperty("AuthenticationType", "0"); // ADC
+        props.setProperty("OAuthType", "3"); // External Account
+        props.setProperty("LogLevel", "6");
+        props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
+        
+        loadDriver(driverClassLoader);
+        return DriverManager.getConnection(DB_URL, props);
+    }
+    
+    private static Connection tryServiceAccountAuth(URLClassLoader driverClassLoader) throws Exception {
+        Properties props = new Properties();
+        props.setProperty("AuthenticationType", "1"); // Service Account
+        props.setProperty("KeyFile", CREDENTIAL_FILE_PATH);
+        props.setProperty("LogLevel", "6");
+        props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
+        
+        loadDriver(driverClassLoader);
+        return DriverManager.getConnection(DB_URL, props);
+    }
+    
+    private static Connection tryManualTokenAuth(URLClassLoader driverClassLoader) throws Exception {
+        // This would require manual token generation, skip for now
+        throw new Exception("Manual token generation not implemented yet");
+    }
+    
+    private static void loadDriver(URLClassLoader driverClassLoader) throws Exception {
+        try {
+            Class<?> driverClassObj = Class.forName("com.simba.googlebigquery.jdbc.Driver", true, driverClassLoader);
+            java.sql.Driver driver = (java.sql.Driver) driverClassObj.getDeclaredConstructor().newInstance();
+            DriverManager.registerDriver(new DriverShim(driver));
+        } catch (Exception e) {
+            throw new Exception("Failed to load BigQuery driver: " + e.getMessage(), e);
+        }
+    }
+    
+    private static void testConnection(Connection connection) throws SQLException {
+        if (connection != null) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            System.out.println("Database Product: " + metaData.getDatabaseProductName());
+            System.out.println("Database Version: " + metaData.getDatabaseProductVersion());
+            System.out.println("Driver Name: " + metaData.getDriverName());
+            System.out.println("Driver Version: " + metaData.getDriverVersion());
+            
+            if (connection.isValid(10)) {
+                System.out.println("✓ Connection is valid and responsive");
+            } else {
+                System.out.println("✗ Connection is not responding");
+            }
+            
+            connection.close();
+            System.out.println("✓ Connection closed successfully");
         }
     }
     
