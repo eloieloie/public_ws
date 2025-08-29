@@ -266,16 +266,16 @@ public class chk_jdbc {
             // Try Service Account instead of ADC since ADC is failing
             Properties props = new Properties();
             
-            // Use Service Account authentication with our WIF credential file
-            props.setProperty("AuthenticationType", "1"); // Service Account
-            props.setProperty("KeyFile", CREDENTIAL_FILE_PATH); // Point to WIF credential file
+            // Use External Account authentication for WIF
+            props.setProperty("AuthenticationType", "4"); // External Account (designed for WIF)
+            props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH); // WIF credential file path
             props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation OAuth Type
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (Service Account + WIF approach):");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Service Account)");
-            System.out.println("  KeyFile: " + props.getProperty("KeyFile"));
+            System.out.println("Connection properties (External Account + WIF approach):");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (External Account)");
+            System.out.println("  CredentialsPath: " + props.getProperty("CredentialsPath"));
             System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
             
