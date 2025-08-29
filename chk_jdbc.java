@@ -102,23 +102,20 @@ public class chk_jdbc {
             // Validate credential files before attempting connection
             validateCredentialFiles();
             
-            // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
+                        // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
             System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
             
-            // Set up connection properties for WIF authentication
+            // Set up connection properties for ADC (Application Default Credentials)
+            // Since the driver wants to use ADC, let's work with it instead of against it
             Properties props = new Properties();
-            props.setProperty("AuthenticationType", "4"); // External Account
-            props.setProperty("OAuthType", "3"); // External Account OAuth Type
-            props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH);
             
-            // Additional properties that might help with WIF
+            // Use Application Default Credentials (AuthenticationType = 0)
+            props.setProperty("AuthenticationType", "0"); // Application Default Credentials
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties:");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType"));
-            System.out.println("  OAuthType: " + props.getProperty("OAuthType"));
-            System.out.println("  CredentialsPath: " + props.getProperty("CredentialsPath"));
+            System.out.println("Connection properties (ADC approach):");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
             
             // Try to load BigQuery driver - we know it's the Simba driver
