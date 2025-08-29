@@ -41,16 +41,12 @@ public class chk_jdbc {
             URL[] urls = new URL[jarFiles.length];
             for (int i = 0; i < jarFiles.length; i++) {
                 urls[i] = jarFiles[i].toURI().toURL();
-                System.out.println("Loading driver: " + jarFiles[i].getName());
             }
             
             URLClassLoader classLoader = new URLClassLoader(urls, Thread.currentThread().getContextClassLoader());
             Thread.currentThread().setContextClassLoader(classLoader);
             
             System.out.println("✓ BigQuery drivers loaded from: " + BIGQUERY_DRIVER_PATH);
-            
-            // Try to find available JDBC drivers
-            findAvailableDrivers(classLoader);
             
             return classLoader;
             
@@ -59,30 +55,6 @@ public class chk_jdbc {
             e.printStackTrace();
             return null;
         }
-    }
-    
-    /**
-     * Attempt to find available JDBC drivers in the loaded JARs
-     */
-    private static void findAvailableDrivers(URLClassLoader classLoader) {
-        String[] possibleDrivers = {
-            "com.simba.googlebigquery.jdbc.Driver",
-            "com.google.cloud.bigquery.jdbc.Driver", 
-            "com.google.cloud.spark.bigquery.jdbc.Driver",
-            "com.google.cloud.bigquery.jdbc42.Driver",
-            "com.simba.jdbc.googlebigquery.Driver"
-        };
-        
-        System.out.println("\n--- Checking for available drivers ---");
-        for (String driver : possibleDrivers) {
-            try {
-                Class.forName(driver, false, classLoader);
-                System.out.println("✓ Found driver: " + driver);
-            } catch (ClassNotFoundException e) {
-                System.out.println("× Not found: " + driver);
-            }
-        }
-        System.out.println("--- End driver check ---\n");
     }
     
     /**
@@ -114,34 +86,18 @@ public class chk_jdbc {
             System.out.println("  OAuthType: " + props.getProperty("OAuthType"));
             System.out.println("  CredentialsPath: " + props.getProperty("CredentialsPath"));
             
-            // Try to load BigQuery driver - try multiple possible class names
-            String[] driverClasses = {
-                "com.simba.googlebigquery.jdbc.Driver",           // Simba driver
-                "com.google.cloud.bigquery.jdbc.Driver",         // Google driver
-                "com.google.cloud.spark.bigquery.jdbc.Driver"    // Alternative Google driver
-            };
-            
-            String loadedDriver = null;
-            for (String driverClass : driverClasses) {
-                try {
-                    System.out.println("Attempting to load driver: " + driverClass);
-                    Class<?> driverClassObj = Class.forName(driverClass, true, driverClassLoader);
-                    System.out.println("Driver class loaded successfully: " + driverClassObj.getName());
-                    
-                    // Instantiate the driver to register it with DriverManager
-                    java.sql.Driver driver = (java.sql.Driver) driverClassObj.getDeclaredConstructor().newInstance();
-                    DriverManager.registerDriver(new DriverShim(driver));
-                    
-                    loadedDriver = driverClass;
-                    System.out.println("✓ Successfully loaded and registered driver: " + driverClass);
-                    break;
-                } catch (Exception e) {
-                    System.out.println("× Failed to load driver " + driverClass + ": " + e.getMessage());
-                }
-            }
-            
-            if (loadedDriver == null) {
-                throw new ClassNotFoundException("No BigQuery JDBC driver could be loaded and registered");
+            // Try to load BigQuery driver - we know it's the Simba driver
+            try {
+                System.out.println("Loading BigQuery JDBC driver...");
+                Class<?> driverClassObj = Class.forName("com.simba.googlebigquery.jdbc.Driver", true, driverClassLoader);
+                
+                // Instantiate the driver to register it with DriverManager
+                java.sql.Driver driver = (java.sql.Driver) driverClassObj.getDeclaredConstructor().newInstance();
+                DriverManager.registerDriver(new DriverShim(driver));
+                
+                System.out.println("✓ Successfully loaded and registered BigQuery driver");
+            } catch (Exception e) {
+                throw new Exception("Failed to load BigQuery driver: " + e.getMessage(), e);
             }
             
             // Attempt to establish connection
