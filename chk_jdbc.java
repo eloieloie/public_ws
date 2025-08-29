@@ -262,19 +262,19 @@ public class chk_jdbc {
             testGoogleCredentials();
             
             // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
-            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);            // Set up connection properties for ADC (Application Default Credentials)
-            // Since the driver wants to use ADC, let's work with it instead of against it
+            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);            // Set up connection properties for Service Account authentication
+            // Try Service Account instead of ADC since ADC is failing
             Properties props = new Properties();
             
-            // Use Application Default Credentials but specify OAuthType for external account
-            props.setProperty("AuthenticationType", "0"); // Application Default Credentials
-            props.setProperty("OAuthType", "3"); // External Account OAuth Type (required by driver)
+            // Use Service Account authentication with our WIF credential file
+            props.setProperty("AuthenticationType", "1"); // Service Account
+            props.setProperty("KeyFile", CREDENTIAL_FILE_PATH); // Point to WIF credential file
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (ADC + OAuthType approach):");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
-            System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (External Account)");
+            System.out.println("Connection properties (Service Account approach):");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Service Account)");
+            System.out.println("  KeyFile: " + props.getProperty("KeyFile"));
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
             
             // Try to load BigQuery driver - we know it's the Simba driver
