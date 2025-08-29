@@ -24,18 +24,18 @@ public class chk_jdbc {
     /**
      * Load BigQuery JDBC drivers from the specified directory
      */
-    private static void loadBigQueryDrivers() {
+    private static URLClassLoader loadBigQueryDrivers() {
         try {
             File driverDir = new File(BIGQUERY_DRIVER_PATH);
             if (!driverDir.exists() || !driverDir.isDirectory()) {
                 System.out.println("Warning: BigQuery driver directory not found: " + BIGQUERY_DRIVER_PATH);
-                return;
+                return null;
             }
             
             File[] jarFiles = driverDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".jar"));
             if (jarFiles == null || jarFiles.length == 0) {
                 System.out.println("Warning: No JAR files found in BigQuery driver directory");
-                return;
+                return null;
             }
             
             URL[] urls = new URL[jarFiles.length];
@@ -52,9 +52,12 @@ public class chk_jdbc {
             // Try to find available JDBC drivers
             findAvailableDrivers(classLoader);
             
+            return classLoader;
+            
         } catch (Exception e) {
             System.out.println("✗ Error loading BigQuery drivers: " + e.getMessage());
             e.printStackTrace();
+            return null;
         }
     }
     
@@ -94,8 +97,8 @@ public class chk_jdbc {
             System.out.println("Service Account Token File: " + SERVICE_ACCOUNT_TOKEN_FILE);
             System.out.println("-".repeat(50));
             
-            // Load BigQuery drivers first
-            loadBigQueryDrivers();
+            // Load BigQuery drivers first and get the class loader
+            URLClassLoader driverClassLoader = loadBigQueryDrivers();
             
             // Set up connection properties for WIF authentication
             Properties props = new Properties();
@@ -112,7 +115,7 @@ public class chk_jdbc {
             String loadedDriver = null;
             for (String driverClass : driverClasses) {
                 try {
-                    Class.forName(driverClass);
+                    Class.forName(driverClass, true, driverClassLoader);
                     loadedDriver = driverClass;
                     System.out.println("✓ Successfully loaded driver: " + driverClass);
                     break;
