@@ -264,18 +264,20 @@ public class chk_jdbc {
             // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
             System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
             
-            // Hybrid approach - ADC with explicit OAuthType (since it's required)
+            // Use Application Default Credentials with required OAuthType
             Properties props = new Properties();
             
-            // Add the required OAuthType but let ADC handle the rest
+            // Explicit ADC + required OAuthType combination
+            props.setProperty("AuthenticationType", "0"); // Application Default Credentials
             props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation (required!)
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (ADC + required OAuthType=2):");
+            System.out.println("Connection properties (ADC=0 + OAuthType=2 explicit combination):");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
             System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation - REQUIRED)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
-            System.out.println("  Note: No AuthenticationType specified - letting ADC handle it with WIF credentials");
+            System.out.println("  Note: Explicit ADC + OAuthType combination for WIF");
             
             // Try to load BigQuery driver - we know it's the Simba driver
             try {
