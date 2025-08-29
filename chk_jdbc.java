@@ -269,12 +269,14 @@ public class chk_jdbc {
             // Use Service Account authentication with our WIF credential file
             props.setProperty("AuthenticationType", "1"); // Service Account
             props.setProperty("KeyFile", CREDENTIAL_FILE_PATH); // Point to WIF credential file
+            props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation OAuth Type
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (Service Account approach):");
+            System.out.println("Connection properties (Service Account + WIF approach):");
             System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Service Account)");
             System.out.println("  KeyFile: " + props.getProperty("KeyFile"));
+            System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
             
             // Try to load BigQuery driver - we know it's the Simba driver
