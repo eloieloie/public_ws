@@ -5,6 +5,9 @@ import java.sql.DatabaseMetaData;
 import java.util.Properties;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.File;
+import java.net.URL;
+import java.net.URLClassLoader;
 
 public class chk_jdbc {
     
@@ -12,9 +15,44 @@ public class chk_jdbc {
     private static final String DB_URL = "jdbc:bigquery://https://private.googleapis.com/bigquery/v2:443;ProjectId=tnn-sb-to970548-1;DefaultDataset=your_dataset";
     private static final String CREDENTIAL_FILE_PATH = "/path/to/wif-credentials.json";
     private static final String SERVICE_ACCOUNT_TOKEN_FILE = "/var/run/service-account/token";
+    private static final String BIGQUERY_DRIVER_PATH = "/opt/denodo/lib/extensions/jdbc-drivers-external/bigquery";
     
     public static void main(String[] args) {
         testBigQueryJdbcConnection();
+    }
+    
+    /**
+     * Load BigQuery JDBC drivers from the specified directory
+     */
+    private static void loadBigQueryDrivers() {
+        try {
+            File driverDir = new File(BIGQUERY_DRIVER_PATH);
+            if (!driverDir.exists() || !driverDir.isDirectory()) {
+                System.out.println("Warning: BigQuery driver directory not found: " + BIGQUERY_DRIVER_PATH);
+                return;
+            }
+            
+            File[] jarFiles = driverDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".jar"));
+            if (jarFiles == null || jarFiles.length == 0) {
+                System.out.println("Warning: No JAR files found in BigQuery driver directory");
+                return;
+            }
+            
+            URL[] urls = new URL[jarFiles.length];
+            for (int i = 0; i < jarFiles.length; i++) {
+                urls[i] = jarFiles[i].toURI().toURL();
+                System.out.println("Loading driver: " + jarFiles[i].getName());
+            }
+            
+            URLClassLoader classLoader = new URLClassLoader(urls, Thread.currentThread().getContextClassLoader());
+            Thread.currentThread().setContextClassLoader(classLoader);
+            
+            System.out.println("✓ BigQuery drivers loaded from: " + BIGQUERY_DRIVER_PATH);
+            
+        } catch (Exception e) {
+            System.out.println("✗ Error loading BigQuery drivers: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     /**
@@ -28,6 +66,9 @@ public class chk_jdbc {
             System.out.println("Database URL: " + DB_URL);
             System.out.println("Service Account Token File: " + SERVICE_ACCOUNT_TOKEN_FILE);
             System.out.println("-".repeat(50));
+            
+            // Load BigQuery drivers first
+            loadBigQueryDrivers();
             
             // Set up connection properties for WIF authentication
             Properties props = new Properties();
