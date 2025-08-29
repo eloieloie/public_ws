@@ -18,6 +18,9 @@ public class chk_jdbc {
     private static final String BIGQUERY_DRIVER_PATH = "/opt/denodo/lib/extensions/jdbc-drivers-external/bigquery";
     
     public static void main(String[] args) {
+        // Set environment variable before any Google libraries are loaded
+        System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", "/opt/denodo/work/eloi_work/wif-credentials.json");
+        
         testBigQueryJdbcConnection();
     }
     
@@ -54,6 +57,40 @@ public class chk_jdbc {
             System.out.println("✗ Error loading BigQuery drivers: " + e.getMessage());
             e.printStackTrace();
             return null;
+        }
+    }
+    
+    /**
+     * Test if we can load Google credentials directly
+     */
+    private static void testGoogleCredentials() {
+        try {
+            System.out.println("Testing Google Credentials directly...");
+            
+            // Try to use reflection to load Google credentials without requiring the dependency at compile time
+            Class<?> googleCredentialsClass = Class.forName("com.google.auth.oauth2.GoogleCredentials");
+            java.lang.reflect.Method fromStreamMethod = googleCredentialsClass.getMethod("fromStream", java.io.InputStream.class);
+            java.lang.reflect.Method createScopedMethod = googleCredentialsClass.getMethod("createScoped", java.util.Collection.class);
+            java.lang.reflect.Method refreshMethod = googleCredentialsClass.getMethod("refreshAccessToken");
+            
+            Object credentials = fromStreamMethod.invoke(null, new FileInputStream(CREDENTIAL_FILE_PATH));
+            credentials = createScopedMethod.invoke(credentials, java.util.Arrays.asList("https://www.googleapis.com/auth/cloud-platform"));
+            
+            System.out.println("✓ Google credentials loaded successfully");
+            System.out.println("  Credential type: " + credentials.getClass().getSimpleName());
+            
+            // Try to get an access token
+            Object accessToken = refreshMethod.invoke(credentials);
+            System.out.println("✓ Access token obtained successfully");
+            
+        } catch (ClassNotFoundException e) {
+            System.out.println("× Google Auth library not found in classpath");
+            System.out.println("  This is expected - continuing with JDBC driver's internal auth");
+        } catch (Exception e) {
+            System.out.println("× Failed to load Google credentials: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.out.println("  Root cause: " + e.getCause().getMessage());
+            }
         }
     }
     
@@ -102,10 +139,11 @@ public class chk_jdbc {
             // Validate credential files before attempting connection
             validateCredentialFiles();
             
-                        // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
-            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
+            // Test Google credentials loading (if available)
+            testGoogleCredentials();
             
-            // Set up connection properties for ADC (Application Default Credentials)
+            // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
+            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);            // Set up connection properties for ADC (Application Default Credentials)
             // Since the driver wants to use ADC, let's work with it instead of against it
             Properties props = new Properties();
             
