@@ -106,7 +106,13 @@ public class chk_jdbc {
             // Set up connection properties for WIF authentication
             Properties props = new Properties();
             props.setProperty("AuthenticationType", "4"); // External Account
+            props.setProperty("OAuthType", "3"); // External Account OAuth Type
             props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH);
+            
+            System.out.println("Connection properties:");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType"));
+            System.out.println("  OAuthType: " + props.getProperty("OAuthType"));
+            System.out.println("  CredentialsPath: " + props.getProperty("CredentialsPath"));
             
             // Try to load BigQuery driver - try multiple possible class names
             String[] driverClasses = {
@@ -253,6 +259,12 @@ public class chk_jdbc {
             System.out.println("• Verify the service account has BigQuery permissions");
             System.out.println("• Check if the Kubernetes service account is properly annotated");
             System.out.println("• Validate the audience field in WIF credentials matches the workload identity provider");
+        }
+        
+        if (errorMessage.contains("required setting oauthtype") || errorMessage.contains("oauthtype is not present")) {
+            System.out.println("• Add OAuthType=3 for External Account authentication");
+            System.out.println("• Ensure AuthenticationType=4 for External Account");
+            System.out.println("• Verify CredentialsPath points to valid WIF credential file");
         }
         
         if (errorMessage.contains("no suitable driver")) {
