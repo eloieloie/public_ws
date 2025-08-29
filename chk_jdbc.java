@@ -49,10 +49,37 @@ public class chk_jdbc {
             
             System.out.println("✓ BigQuery drivers loaded from: " + BIGQUERY_DRIVER_PATH);
             
+            // Try to find available JDBC drivers
+            findAvailableDrivers(classLoader);
+            
         } catch (Exception e) {
             System.out.println("✗ Error loading BigQuery drivers: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Attempt to find available JDBC drivers in the loaded JARs
+     */
+    private static void findAvailableDrivers(URLClassLoader classLoader) {
+        String[] possibleDrivers = {
+            "com.simba.googlebigquery.jdbc.Driver",
+            "com.google.cloud.bigquery.jdbc.Driver", 
+            "com.google.cloud.spark.bigquery.jdbc.Driver",
+            "com.google.cloud.bigquery.jdbc42.Driver",
+            "com.simba.jdbc.googlebigquery.Driver"
+        };
+        
+        System.out.println("\n--- Checking for available drivers ---");
+        for (String driver : possibleDrivers) {
+            try {
+                Class.forName(driver, false, classLoader);
+                System.out.println("✓ Found driver: " + driver);
+            } catch (ClassNotFoundException e) {
+                System.out.println("× Not found: " + driver);
+            }
+        }
+        System.out.println("--- End driver check ---\n");
     }
     
     /**
@@ -75,8 +102,28 @@ public class chk_jdbc {
             props.setProperty("AuthenticationType", "4"); // External Account
             props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH);
             
-            // Load Simba BigQuery driver
-            Class.forName("com.simba.googlebigquery.jdbc.Driver");
+            // Try to load BigQuery driver - try multiple possible class names
+            String[] driverClasses = {
+                "com.simba.googlebigquery.jdbc.Driver",           // Simba driver
+                "com.google.cloud.bigquery.jdbc.Driver",         // Google driver
+                "com.google.cloud.spark.bigquery.jdbc.Driver"    // Alternative Google driver
+            };
+            
+            String loadedDriver = null;
+            for (String driverClass : driverClasses) {
+                try {
+                    Class.forName(driverClass);
+                    loadedDriver = driverClass;
+                    System.out.println("✓ Successfully loaded driver: " + driverClass);
+                    break;
+                } catch (ClassNotFoundException e) {
+                    System.out.println("× Driver not found: " + driverClass);
+                }
+            }
+            
+            if (loadedDriver == null) {
+                throw new ClassNotFoundException("No BigQuery JDBC driver found. Tried: " + String.join(", ", driverClasses));
+            }
             
             // Attempt to establish connection
             connection = DriverManager.getConnection(DB_URL, props);
