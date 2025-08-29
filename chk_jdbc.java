@@ -264,20 +264,17 @@ public class chk_jdbc {
             // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
             System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
             
-            // Set up connection properties for Application Default Credentials with WIF
+            // Simplified approach - let ADC auto-detect WIF (Gemini's insight)
             Properties props = new Properties();
             
-            // Use Application Default Credentials with OAuthType=2 for WIF
-            props.setProperty("AuthenticationType", "0"); // Application Default Credentials (ADC)
-            props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation OAuth Type (this was working!)
+            // Only set logging properties - let driver auto-detect authentication
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (ADC + OAuthType=2 WIF approach):");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
-            System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation)");
+            System.out.println("Connection properties (Simplified ADC approach - Gemini's suggestion):");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
-            System.out.println("  Note: Using OAuthType=2 which was working to some extent");
+            System.out.println("  Note: Letting ADC auto-detect WIF from credentials file (no explicit auth type)");
+            System.out.println("  Note: Driver should automatically use the WIF credentials");
             
             // Try to load BigQuery driver - we know it's the Simba driver
             try {
