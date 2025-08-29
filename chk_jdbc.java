@@ -102,16 +102,24 @@ public class chk_jdbc {
             // Validate credential files before attempting connection
             validateCredentialFiles();
             
+            // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
+            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
+            
             // Set up connection properties for WIF authentication
             Properties props = new Properties();
             props.setProperty("AuthenticationType", "4"); // External Account
             props.setProperty("OAuthType", "3"); // External Account OAuth Type
             props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH);
             
+            // Additional properties that might help with WIF
+            props.setProperty("LogLevel", "6"); // Enable detailed logging
+            props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
+            
             System.out.println("Connection properties:");
             System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType"));
             System.out.println("  OAuthType: " + props.getProperty("OAuthType"));
             System.out.println("  CredentialsPath: " + props.getProperty("CredentialsPath"));
+            System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
             
             // Try to load BigQuery driver - we know it's the Simba driver
             try {
@@ -234,6 +242,14 @@ public class chk_jdbc {
         System.out.println("\n--- BigQuery Troubleshooting Suggestions ---");
         
         String errorMessage = e.getMessage().toLowerCase();
+        
+        if (errorMessage.contains("unable to obtain application default credentials")) {
+            System.out.println("• The driver is trying to use Application Default Credentials (ADC)");
+            System.out.println("• Set GOOGLE_APPLICATION_CREDENTIALS environment variable to WIF credential file");
+            System.out.println("• Verify the WIF credential file is in the correct JSON format");
+            System.out.println("• Check if the service account token file is accessible");
+            System.out.println("• Try setting LogLevel=6 to see detailed authentication logs");
+        }
         
         if (errorMessage.contains("error requesting access token") || errorMessage.contains("httptransport io error")) {
             System.out.println("• Check WIF credential file exists at: " + CREDENTIAL_FILE_PATH);
