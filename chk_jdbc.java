@@ -109,13 +109,15 @@ public class chk_jdbc {
             // Since the driver wants to use ADC, let's work with it instead of against it
             Properties props = new Properties();
             
-            // Use Application Default Credentials (AuthenticationType = 0)
+            // Use Application Default Credentials but specify OAuthType for external account
             props.setProperty("AuthenticationType", "0"); // Application Default Credentials
+            props.setProperty("OAuthType", "3"); // External Account OAuth Type (required by driver)
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (ADC approach):");
+            System.out.println("Connection properties (ADC + OAuthType approach):");
             System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
+            System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (External Account)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
             
             // Try to load BigQuery driver - we know it's the Simba driver
