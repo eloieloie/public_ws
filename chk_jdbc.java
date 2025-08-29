@@ -262,22 +262,22 @@ public class chk_jdbc {
             testGoogleCredentials();
             
             // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
-            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);            // Set up connection properties for Service Account authentication
-            // Try Service Account instead of ADC since ADC is failing
+            System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
+            
+            // Set up connection properties for Application Default Credentials with WIF
             Properties props = new Properties();
             
-            // Use External Account authentication for WIF
-            props.setProperty("AuthenticationType", "4"); // External Account (designed for WIF)
-            props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH); // WIF credential file path
-            props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation OAuth Type
+            // Use Application Default Credentials with OAuthType=2 for WIF
+            props.setProperty("AuthenticationType", "0"); // Application Default Credentials (ADC)
+            props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation OAuth Type (this was working!)
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (External Account + WIF approach):");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (External Account)");
-            System.out.println("  CredentialsPath: " + props.getProperty("CredentialsPath"));
+            System.out.println("Connection properties (ADC + OAuthType=2 WIF approach):");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
             System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
+            System.out.println("  Note: Using OAuthType=2 which was working to some extent");
             
             // Try to load BigQuery driver - we know it's the Simba driver
             try {
