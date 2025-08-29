@@ -99,6 +99,9 @@ public class chk_jdbc {
             
             // Load BigQuery drivers first and get the class loader
             URLClassLoader driverClassLoader = loadBigQueryDrivers();
+            if (driverClassLoader == null) {
+                throw new Exception("Failed to load BigQuery drivers");
+            }
             
             // Set up connection properties for WIF authentication
             Properties props = new Properties();
@@ -115,17 +118,24 @@ public class chk_jdbc {
             String loadedDriver = null;
             for (String driverClass : driverClasses) {
                 try {
-                    Class.forName(driverClass, true, driverClassLoader);
+                    System.out.println("Attempting to load driver: " + driverClass);
+                    Class<?> driverClassObj = Class.forName(driverClass, true, driverClassLoader);
+                    System.out.println("Driver class loaded successfully: " + driverClassObj.getName());
+                    
+                    // Instantiate the driver to register it with DriverManager
+                    java.sql.Driver driver = (java.sql.Driver) driverClassObj.getDeclaredConstructor().newInstance();
+                    DriverManager.registerDriver(new DriverShim(driver));
+                    
                     loadedDriver = driverClass;
-                    System.out.println("✓ Successfully loaded driver: " + driverClass);
+                    System.out.println("✓ Successfully loaded and registered driver: " + driverClass);
                     break;
-                } catch (ClassNotFoundException e) {
-                    System.out.println("× Driver not found: " + driverClass);
+                } catch (Exception e) {
+                    System.out.println("× Failed to load driver " + driverClass + ": " + e.getMessage());
                 }
             }
             
             if (loadedDriver == null) {
-                throw new ClassNotFoundException("No BigQuery JDBC driver found. Tried: " + String.join(", ", driverClasses));
+                throw new ClassNotFoundException("No BigQuery JDBC driver could be loaded and registered");
             }
             
             // Attempt to establish connection
@@ -282,6 +292,45 @@ public class chk_jdbc {
         } catch (SQLException e) {
             System.out.println("Connection test failed: " + e.getMessage());
             return false;
+        }
+    }
+    
+    /**
+     * Driver wrapper to handle class loader issues with DriverManager
+     */
+    static class DriverShim implements java.sql.Driver {
+        private java.sql.Driver driver;
+        
+        DriverShim(java.sql.Driver driver) {
+            this.driver = driver;
+        }
+        
+        public boolean acceptsURL(String url) throws SQLException {
+            return driver.acceptsURL(url);
+        }
+        
+        public Connection connect(String url, Properties info) throws SQLException {
+            return driver.connect(url, info);
+        }
+        
+        public int getMajorVersion() {
+            return driver.getMajorVersion();
+        }
+        
+        public int getMinorVersion() {
+            return driver.getMinorVersion();
+        }
+        
+        public java.sql.DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
+            return driver.getPropertyInfo(url, info);
+        }
+        
+        public boolean jdbcCompliant() {
+            return driver.jdbcCompliant();
+        }
+        
+        public java.util.logging.Logger getParentLogger() throws java.sql.SQLFeatureNotSupportedException {
+            return driver.getParentLogger();
         }
     }
 }
