@@ -424,7 +424,7 @@ public class chk_jdbc_fixed {
             // STS endpoint and parameters (from your WIF credentials)
             String stsUrl = "https://sts.googleapis.com/v1/token";
             String audience = "//iam.googleapis.com/projects/618647108376/locations/global/workloadIdentityPools/automation/providers/aks-aks-denodo-updater-sa";
-            String scope = "https://www.googleapis.com/auth/cloud-platform";
+            String scope = "https://www.googleapis.com/auth/bigquery"; // More specific BigQuery scope
             
             // Build the POST request body
             String requestBody = "audience=" + java.net.URLEncoder.encode(audience, "UTF-8") +
