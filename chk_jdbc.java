@@ -612,18 +612,30 @@ public class chk_jdbc {
                     String responseStr = response.toString();
                     System.out.println("  STS response: " + responseStr.substring(0, Math.min(200, responseStr.length())) + "...");
                     
-                    // Better JSON parsing for access_token
-                    if (responseStr.contains("\"access_token\"")) {
-                        int startIdx = responseStr.indexOf("\"access_token\":\"") + 16;
-                        int endIdx = responseStr.indexOf("\"", startIdx);
-                        if (startIdx > 15 && endIdx > startIdx) {
-                            String accessToken = responseStr.substring(startIdx, endIdx);
-                            System.out.println("✓ Successfully exchanged token via STS");
-                            System.out.println("  Access token length: " + accessToken.length());
-                            System.out.println("  Access token preview: " + accessToken.substring(0, Math.min(50, accessToken.length())) + "...");
-                            return accessToken;
+                    // Better JSON parsing for access_token - handle whitespace and formatting
+                    if (responseStr.contains("access_token")) {
+                        // Find the access_token field, handling various JSON formatting
+                        String pattern = "\"access_token\"\\s*:\\s*\"";
+                        int startIdx = responseStr.indexOf("\"access_token\"");
+                        if (startIdx > -1) {
+                            // Find the start of the token value (after the quote)
+                            int valueStart = responseStr.indexOf("\"", responseStr.indexOf(":", startIdx)) + 1;
+                            // Find the end of the token value (next quote)
+                            int valueEnd = responseStr.indexOf("\"", valueStart);
+                            
+                            if (valueStart > 0 && valueEnd > valueStart) {
+                                String accessToken = responseStr.substring(valueStart, valueEnd);
+                                System.out.println("✓ Successfully exchanged token via STS");
+                                System.out.println("  Access token length: " + accessToken.length());
+                                System.out.println("  Access token preview: " + accessToken.substring(0, Math.min(50, accessToken.length())) + "...");
+                                return accessToken;
+                            } else {
+                                System.out.println("✗ Failed to find token boundaries in STS response");
+                                System.out.println("  valueStart: " + valueStart + ", valueEnd: " + valueEnd);
+                                return null;
+                            }
                         } else {
-                            System.out.println("✗ Failed to parse access_token from STS response");
+                            System.out.println("✗ access_token field not found in STS response");
                             return null;
                         }
                     } else {
