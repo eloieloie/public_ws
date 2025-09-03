@@ -517,11 +517,13 @@ public class chk_jdbc_fixed {
                             int valueEnd = responseStr.indexOf("\"", valueStart);
                             
                             if (valueStart > 0 && valueEnd > valueStart) {
-                                String accessToken = responseStr.substring(valueStart, valueEnd);
-                                System.out.println("✓ Successfully exchanged token via STS");
-                                System.out.println("  Access token length: " + accessToken.length());
-                                System.out.println("  Access token preview: " + accessToken.substring(0, Math.min(50, accessToken.length())) + "...");
-                                return accessToken;
+                                String federatedToken = responseStr.substring(valueStart, valueEnd);
+                                System.out.println("✓ Got federated token, now impersonating service account...");
+                                System.out.println("  Federated token length: " + federatedToken.length());
+                                System.out.println("  Federated token preview: " + federatedToken.substring(0, Math.min(50, federatedToken.length())) + "...");
+                                
+                                // Now use the federated token to impersonate the service account
+                                return impersonateServiceAccount(federatedToken);
                             } else {
                                 System.out.println("✗ Failed to find token boundaries in STS response");
                                 System.out.println("  valueStart: " + valueStart + ", valueEnd: " + valueEnd);
@@ -555,6 +557,85 @@ public class chk_jdbc_fixed {
             e.printStackTrace();
             return null;
         }
+    }
+    
+    /**
+     * Impersonate service account using the federated token
+     */
+    private static String impersonateServiceAccount(String federatedToken) {
+        try {
+            System.out.println("Impersonating service account...");
+            
+            // Service account to impersonate
+            String serviceAccountEmail = "aks-denodo-updater-sa@tnn-sb-to970548-1.iam.gserviceaccount.com";
+            String scope = "https://www.googleapis.com/auth/bigquery https://www.googleapis.com/auth/cloud-platform";
+            
+            // Build the impersonation request
+            String requestBody = "{" +
+                    "\"scope\":[\"https://www.googleapis.com/auth/bigquery\",\"https://www.googleapis.com/auth/cloud-platform\"]," +
+                    "\"delegates\":[]," +
+                    "\"includeEmail\":true" +
+                    "}";
+            
+            // Make service account impersonation request
+            String impersonateUrl = "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/" + 
+                    serviceAccountEmail + ":generateAccessToken";
+            java.net.URL url = new java.net.URL(impersonateUrl);
+            java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Authorization", "Bearer " + federatedToken);
+            connection.setDoOutput(true);
+            
+            try (java.io.OutputStream os = connection.getOutputStream()) {
+                os.write(requestBody.getBytes("UTF-8"));
+            }
+            
+            int responseCode = connection.getResponseCode();
+            System.out.println("  Impersonation response code: " + responseCode);
+            
+            if (responseCode == 200) {
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream()))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                    String responseStr = response.toString();
+                    System.out.println("  Impersonation response: " + responseStr.substring(0, Math.min(200, responseStr.length())) + "...");
+                    
+                    // Parse the access token
+                    if (responseStr.contains("accessToken")) {
+                        int startIdx = responseStr.indexOf("\"accessToken\"");
+                        if (startIdx > -1) {
+                            int valueStart = responseStr.indexOf("\"", responseStr.indexOf(":", startIdx)) + 1;
+                            int valueEnd = responseStr.indexOf("\"", valueStart);
+                            
+                            if (valueStart > 0 && valueEnd > valueStart) {
+                                String impersonatedToken = responseStr.substring(valueStart, valueEnd);
+                                System.out.println("✓ Successfully impersonated service account");
+                                System.out.println("  Impersonated token length: " + impersonatedToken.length());
+                                System.out.println("  Impersonated token preview: " + impersonatedToken.substring(0, Math.min(50, impersonatedToken.length())) + "...");
+                                return impersonatedToken;
+                            }
+                        }
+                    }
+                    System.out.println("✗ Failed to parse impersonation response");
+                }
+            } else {
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(connection.getErrorStream()))) {
+                    StringBuilder error = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        error.append(line);
+                    }
+                    System.out.println("  Impersonation error: " + error.toString());
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("  Service account impersonation failed: " + e.getMessage());
+        }
+        return null;
     }
     
     /**
