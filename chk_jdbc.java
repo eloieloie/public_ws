@@ -535,12 +535,13 @@ public class chk_jdbc {
             // Step 2: Use the Google access token with JDBC driver
             System.out.println("Using exchanged Google access token with JDBC driver...");
             Properties props = new Properties();
-            // Try using no AuthenticationType and just the access token
+            // Use minimal properties with access token
+            props.setProperty("OAuthType", "1"); // Bearer token method (REQUIRED)
             props.setProperty("OAuthAccessToken", googleAccessToken); // Google access token directly
             props.setProperty("LogLevel", "6");
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
             
-            System.out.println("  No AuthenticationType (let driver auto-detect)");
+            System.out.println("  OAuthType: 1 (Bearer Token - REQUIRED)");
             System.out.println("  OAuthAccessToken: [GOOGLE_ACCESS_TOKEN_PROVIDED]");
             
             // Register the driver with DriverManager using the custom class loader
