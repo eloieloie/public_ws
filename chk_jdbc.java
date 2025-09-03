@@ -536,11 +536,13 @@ public class chk_jdbc {
             System.out.println("Using exchanged Google access token with JDBC driver...");
             Properties props = new Properties();
             props.setProperty("AuthenticationType", "1"); // Service Account authentication
+            props.setProperty("OAuthType", "1"); // Bearer token OAuth type
             props.setProperty("OAuthAccessToken", googleAccessToken); // Google access token
             props.setProperty("LogLevel", "6");
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
             
             System.out.println("  AuthenticationType: 1 (Service Account)");
+            System.out.println("  OAuthType: 1 (Bearer Token)");
             System.out.println("  OAuthAccessToken: [GOOGLE_ACCESS_TOKEN_PROVIDED]");
             
             // Register the driver with DriverManager using the custom class loader
