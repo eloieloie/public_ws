@@ -152,6 +152,48 @@ public class chk_jdbc_fixed {
                 }
             }
             
+            // Approach 3: Try native WIF with CredentialsPath (no manual token exchange)
+            System.out.println("\n--- Approach 3: Native WIF with CredentialsPath ---");
+            try {
+                Properties props = new Properties();
+                props.setProperty("AuthenticationType", "4"); // External Account for WIF
+                props.setProperty("CredentialsPath", CREDENTIAL_FILE_PATH); // WIF credential file
+                props.setProperty("OAuthType", "2"); // WIF OAuth type
+                props.setProperty("LogLevel", "6");
+                props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
+                
+                System.out.println("Connection properties (Native WIF with CredentialsPath):");
+                System.out.println("  AuthenticationType: 4 (External Account for WIF)");
+                System.out.println("  CredentialsPath: " + CREDENTIAL_FILE_PATH);
+                System.out.println("  OAuthType: 2 (WIF/Workload Identity Federation)");
+                System.out.println("  Note: Let driver handle WIF token exchange internally");
+                
+                System.out.println("Loading BigQuery JDBC driver...");
+                Class.forName("com.simba.googlebigquery.jdbc.Driver");
+                System.out.println("✓ Successfully loaded and registered BigQuery driver");
+                
+                connection = DriverManager.getConnection(DB_URL, props);
+                
+                if (connection != null && connection.isValid(5)) {
+                    System.out.println("✓ Native WIF approach SUCCESS!");
+                    System.out.println("✓ BigQuery JDBC connection established successfully!");
+                    
+                    // Test basic connection info
+                    DatabaseMetaData metaData = connection.getMetaData();
+                    System.out.println("Driver Name: " + metaData.getDriverName());
+                    System.out.println("Driver Version: " + metaData.getDriverVersion());
+                    System.out.println("Database Product: " + metaData.getDatabaseProductName());
+                    return; // Success!
+                } else {
+                    System.out.println("✗ Connection validation failed");
+                }
+                
+            } catch (SQLException e) {
+                System.out.println("✗ Native WIF approach failed: " + e.getMessage());
+            } catch (ClassNotFoundException e) {
+                System.out.println("✗ Driver not found: " + e.getMessage());
+            }
+            
             // If we get here, all approaches failed
             System.out.println("\n✗ All authentication approaches failed!");
             
@@ -421,10 +463,11 @@ public class chk_jdbc_fixed {
         try {
             System.out.println("Performing STS token exchange...");
             
-            // STS endpoint and parameters (from your WIF credentials)
+                        // STS endpoint and parameters (from your WIF credentials)
             String stsUrl = "https://sts.googleapis.com/v1/token";
             String audience = "//iam.googleapis.com/projects/618647108376/locations/global/workloadIdentityPools/automation/providers/aks-aks-denodo-updater-sa";
-            String scope = "https://www.googleapis.com/auth/bigquery"; // More specific BigQuery scope
+            // Request specific BigQuery scopes instead of generic cloud-platform
+            String scope = "https://www.googleapis.com/auth/bigquery https://www.googleapis.com/auth/cloud-platform";
             
             // Build the POST request body
             String requestBody = "audience=" + java.net.URLEncoder.encode(audience, "UTF-8") +
