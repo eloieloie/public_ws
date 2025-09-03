@@ -12,6 +12,17 @@ import java.net.URLClassLoader;
 
 public class chk_jdbc {
     
+    /*
+     * IMPORTANT: Simba BigQuery JDBC Driver Requirements
+     * ==================================================
+     * - Both AuthenticationType AND OAuthType are ALWAYS REQUIRED
+     * - Never omit either parameter - driver will fail with configuration errors
+     * - Common combinations:
+     *   - AuthenticationType=0 (ADC) + OAuthType=2 (WIF) for Workload Identity Federation
+     *   - AuthenticationType=1 (Service Account) + OAuthType=1 (Bearer Token) for direct tokens
+     *   - AuthenticationType=4 (External Account) + OAuthType=2 (WIF) for external accounts
+     */
+    
     // BigQuery connection parameters - modify these according to your setup
     private static final String DB_URL = "jdbc:bigquery://https://private.googleapis.com/bigquery/v2:443;ProjectId=tnn-sb-to970548-1;DefaultDataset=your_dataset";
     private static final String CREDENTIAL_FILE_PATH = "/opt/denodo/work/eloi_work/wif-credentials.json";
@@ -495,10 +506,13 @@ public class chk_jdbc {
                 return null;
             }
             
-            // Embed the access token in the JDBC URL
-            String urlWithToken = DB_URL + ";OAuthAccessToken=" + googleAccessToken;
+            // Embed the access token in the JDBC URL with REQUIRED parameters
+            String urlWithToken = DB_URL + 
+                ";AuthenticationType=1" +  // Service Account (REQUIRED)
+                ";OAuthType=1" +            // Bearer Token (REQUIRED)
+                ";OAuthAccessToken=" + googleAccessToken;
             System.out.println("Using JDBC URL with embedded access token...");
-            System.out.println("  URL: " + DB_URL + ";OAuthAccessToken=[TOKEN]");
+            System.out.println("  URL: " + DB_URL + ";AuthenticationType=1;OAuthType=1;OAuthAccessToken=[TOKEN]");
             
             Properties props = new Properties();
             props.setProperty("LogLevel", "6");
@@ -587,15 +601,15 @@ public class chk_jdbc {
             // Step 2: Use the Google access token with JDBC driver
             System.out.println("Using exchanged Google access token with JDBC driver...");
             Properties props = new Properties();
-            // Try using AuthenticationType=0 (ADC) with the access token
-            props.setProperty("AuthenticationType", "0"); // Application Default Credentials
-            props.setProperty("OAuthType", "1"); // Bearer token OAuth type
+            // ALWAYS provide both required parameters - try Service Account auth with token
+            props.setProperty("AuthenticationType", "1"); // Service Account (REQUIRED)
+            props.setProperty("OAuthType", "1"); // Bearer Token (REQUIRED)
             props.setProperty("OAuthAccessToken", googleAccessToken); // Google access token
             props.setProperty("LogLevel", "6");
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
             
-            System.out.println("  AuthenticationType: 0 (ADC)");
-            System.out.println("  OAuthType: 1 (Bearer Token)");
+            System.out.println("  AuthenticationType: 1 (Service Account - REQUIRED)");
+            System.out.println("  OAuthType: 1 (Bearer Token - REQUIRED)");
             System.out.println("  OAuthAccessToken: [GOOGLE_ACCESS_TOKEN_PROVIDED]");
             
             // Register the driver with DriverManager using the custom class loader
