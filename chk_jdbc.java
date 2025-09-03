@@ -268,15 +268,15 @@ public class chk_jdbc {
             System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
             
             // Try multiple authentication approaches
-            Connection connection = null;
-            
             // Approach 1: Direct token usage (if we have a token)
             if (serviceAccountToken != null && !serviceAccountToken.trim().isEmpty()) {
                 System.out.println("\n--- Approach 1: Using Kubernetes Service Account Token Directly ---");
-                connection = tryDirectTokenAuth(serviceAccountToken, driverClassLoader);
-                if (connection != null) {
+                Connection tokenConnection = tryDirectTokenAuth(serviceAccountToken, driverClassLoader);
+                if (tokenConnection != null) {
                     System.out.println("✓ Connection successful with direct token!");
-                    return connection;
+                    // Test the connection and close it
+                    testConnectionSuccess(tokenConnection);
+                    return;
                 }
             }
             
@@ -470,6 +470,32 @@ public class chk_jdbc {
     }
     
     /**
+     * Test a successful connection and display information
+     */
+    private static void testConnectionSuccess(Connection connection) {
+        try {
+            if (connection != null && connection.isValid(5)) {
+                System.out.println("✓ BigQuery connection successful!");
+                DatabaseMetaData metaData = connection.getMetaData();
+                System.out.println("Driver Name: " + metaData.getDriverName());
+                System.out.println("Driver Version: " + metaData.getDriverVersion());
+                System.out.println("Database Product: " + metaData.getDatabaseProductName());
+            }
+        } catch (SQLException e) {
+            System.out.println("✗ Error testing connection: " + e.getMessage());
+        } finally {
+            try {
+                if (connection != null) {
+                    connection.close();
+                    System.out.println("✓ Connection closed successfully");
+                }
+            } catch (SQLException e) {
+                System.out.println("✗ Error closing connection: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
      * Read the Kubernetes service account token directly
      */
     private static String readServiceAccountToken() {
@@ -518,7 +544,7 @@ public class chk_jdbc {
             
             // Create the connection using our custom class loader
             Thread.currentThread().setContextClassLoader(driverClassLoader);
-            return DriverManager.getConnection(DATABASE_URL, props);
+            return DriverManager.getConnection(DB_URL, props);
             
         } catch (SQLException e) {
             System.out.println("✗ Direct token auth failed: " + e.getMessage());
