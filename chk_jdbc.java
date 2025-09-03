@@ -281,6 +281,17 @@ public class chk_jdbc {
                 }
             }
             
+            // Approach 1b: Try URL-embedded token approach
+            if (serviceAccountToken != null && !serviceAccountToken.trim().isEmpty()) {
+                System.out.println("\n--- Approach 1b: Using Access Token in JDBC URL ---");
+                Connection urlTokenConnection = tryUrlTokenAuth(serviceAccountToken, driverClassLoader);
+                if (urlTokenConnection != null) {
+                    System.out.println("✓ Connection successful with URL token!");
+                    testConnectionSuccess(urlTokenConnection);
+                    return;
+                }
+            }
+            
             // Approach 2: ADC + OAuthType=2 (original approach)
             System.out.println("\n--- Approach 2: ADC + OAuthType=2 ---");
             Properties props = new Properties();
@@ -468,6 +479,47 @@ public class chk_jdbc {
         System.out.println("• Ensure token_url points to: https://sts.googleapis.com/v1/token");
         System.out.println("• Validate service_account_impersonation_url is correctly formatted");
         System.out.println("• Check the workload identity binding between KSA and GSA");
+    }
+    
+    /**
+     * Try token authentication by embedding access token in JDBC URL
+     */
+    private static Connection tryUrlTokenAuth(String kubernetesToken, URLClassLoader driverClassLoader) {
+        try {
+            System.out.println("Trying STS token exchange for URL embedding...");
+            
+            // Exchange Kubernetes token for Google Cloud access token via STS
+            String googleAccessToken = exchangeTokenWithSTS(kubernetesToken);
+            if (googleAccessToken == null) {
+                System.out.println("✗ STS token exchange failed for URL approach");
+                return null;
+            }
+            
+            // Embed the access token in the JDBC URL
+            String urlWithToken = DB_URL + ";OAuthAccessToken=" + googleAccessToken;
+            System.out.println("Using JDBC URL with embedded access token...");
+            System.out.println("  URL: " + DB_URL + ";OAuthAccessToken=[TOKEN]");
+            
+            Properties props = new Properties();
+            props.setProperty("LogLevel", "6");
+            props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
+            
+            // Register the driver
+            Thread.currentThread().setContextClassLoader(driverClassLoader);
+            Class<?> driverClass = driverClassLoader.loadClass("com.simba.googlebigquery.jdbc.Driver");
+            Driver driver = (Driver) driverClass.getDeclaredConstructor().newInstance();
+            DriverManager.registerDriver(new DriverShim(driver));
+            
+            // Create the connection with token in URL
+            return DriverManager.getConnection(urlWithToken, props);
+            
+        } catch (SQLException e) {
+            System.out.println("✗ URL token auth failed: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.out.println("✗ Unexpected error in URL token auth: " + e.getMessage());
+            return null;
+        }
     }
     
     /**
