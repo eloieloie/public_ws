@@ -303,33 +303,57 @@ public class chk_jdbc {
                 }
             }
             
-            // Approach 2: UserAccount + OAuthType=2 (WIF requires UserAccount, not ADC!)
-            System.out.println("\n--- Approach 2: UserAccount + OAuthType=2 ---");
-            Properties props = new Properties();
+            // Approach 2: UserAccount + OAuthType=2 with STS token (WIF requires UserAccount, not ADC!)
+            System.out.println("\n--- Approach 2: UserAccount + OAuthType=2 with STS Token ---");
             
-            // CRITICAL: OAuthType=2 (WIF) requires AuthenticationType=2 (UserAccount), not 0 (ADC)
-            props.setProperty("AuthenticationType", "2"); // UserAccount authentication (required for WIF!)
-            props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation (required!)
-            props.setProperty("LogLevel", "6"); // Enable detailed logging
-            props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
-            
-            System.out.println("Connection properties (UserAccount=2 + OAuthType=2 for WIF):");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (UserAccount - REQUIRED for WIF!)");
-            System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation - REQUIRED)");
-            System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
-            System.out.println("  Note: OAuthType=2 requires UserAccount auth, not ADC!");
-            
-            // Try to load BigQuery driver - we know it's the Simba driver
-            try {
-                System.out.println("Loading BigQuery JDBC driver...");
-                Class<?> driverClassObj = Class.forName("com.simba.googlebigquery.jdbc.Driver", true, driverClassLoader);
+            // Get a fresh access token via STS for this approach
+            String wifAccessToken = exchangeTokenWithSTS(serviceAccountToken);
+            if (wifAccessToken != null) {
+                System.out.println("Got WIF access token, trying with UserAccount auth...");
+                Properties props = new Properties();
                 
-                // Instantiate the driver to register it with DriverManager
-                java.sql.Driver driver = (java.sql.Driver) driverClassObj.getDeclaredConstructor().newInstance();
-                DriverManager.registerDriver(new DriverShim(driver));
+                // CRITICAL: OAuthType=2 (WIF) requires AuthenticationType=2 (UserAccount), not 0 (ADC)
+                props.setProperty("AuthenticationType", "2"); // UserAccount authentication (required for WIF!)
+                props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation (required!)
+                props.setProperty("OAuthAccessToken", wifAccessToken); // Provide the STS-exchanged token
+                props.setProperty("OAuthRefreshToken", wifAccessToken); // Also provide as refresh token
+                props.setProperty("LogLevel", "6"); // Enable detailed logging
+                props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
                 
-                System.out.println("✓ Successfully loaded and registered BigQuery driver");
-            } catch (Exception e) {
+                System.out.println("Connection properties (UserAccount=2 + OAuthType=2 + STS token):");
+                System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (UserAccount - REQUIRED for WIF!)");
+                System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation - REQUIRED)");
+                System.out.println("  OAuthAccessToken: [STS_EXCHANGED_TOKEN_PROVIDED]");
+                System.out.println("  OAuthRefreshToken: [STS_EXCHANGED_TOKEN_PROVIDED]");
+                System.out.println("  Note: Using STS-exchanged token with UserAccount + WIF combination");
+                
+                // Try to load BigQuery driver - we know it's the Simba driver
+                try {
+                    System.out.println("Loading BigQuery JDBC driver...");
+                    Class<?> driverClassObj = Class.forName("com.simba.googlebigquery.jdbc.Driver", true, driverClassLoader);
+                    
+                    // Instantiate the driver to register it with DriverManager
+                    java.sql.Driver driver = (java.sql.Driver) driverClassObj.getDeclaredConstructor().newInstance();
+                    DriverManager.registerDriver(new DriverShim(driver));
+                    
+                    System.out.println("✓ Successfully loaded and registered BigQuery driver");
+                    
+                    // Create the connection using our custom class loader
+                    Thread.currentThread().setContextClassLoader(driverClassLoader);
+                    connection = DriverManager.getConnection(DB_URL, props);
+                    
+                    if (connection != null) {
+                        System.out.println("✓ BigQuery connection successful with UserAccount + WIF + STS token!");
+                        testConnectionSuccess(connection);
+                        return;
+                    }
+                    
+                } catch (Exception e) {
+                    System.out.println("✗ UserAccount + WIF approach failed: " + e.getMessage());
+                }
+            } else {
+                System.out.println("✗ Could not get STS token for UserAccount approach");
+            }
                 throw new Exception("Failed to load BigQuery driver: " + e.getMessage(), e);
             }
             
