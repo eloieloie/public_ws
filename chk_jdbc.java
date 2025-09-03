@@ -542,8 +542,15 @@ public class chk_jdbc {
             System.out.println("  OAuthType: 1 (Bearer Token)");
             System.out.println("  OAuthAccessToken: [GOOGLE_ACCESS_TOKEN_PROVIDED]");
             
-            // Create the connection using our custom class loader
+            // Register the driver with DriverManager using the custom class loader
+            System.out.println("Re-registering BigQuery driver for token auth...");
             Thread.currentThread().setContextClassLoader(driverClassLoader);
+            Class<?> driverClass = driverClassLoader.loadClass("com.simba.googlebigquery.jdbc.Driver");
+            Driver driver = (Driver) driverClass.getDeclaredConstructor().newInstance();
+            DriverManager.registerDriver(new DriverShim(driver));
+            System.out.println("✓ BigQuery driver registered for token auth");
+            
+            // Create the connection
             return DriverManager.getConnection(DB_URL, props);
             
         } catch (SQLException e) {
@@ -604,14 +611,20 @@ public class chk_jdbc {
                     String responseStr = response.toString();
                     System.out.println("  STS response: " + responseStr.substring(0, Math.min(200, responseStr.length())) + "...");
                     
-                    // Simple JSON parsing for access_token
-                    if (responseStr.contains("access_token")) {
+                    // Better JSON parsing for access_token
+                    if (responseStr.contains("\"access_token\"")) {
                         int startIdx = responseStr.indexOf("\"access_token\":\"") + 16;
                         int endIdx = responseStr.indexOf("\"", startIdx);
-                        String accessToken = responseStr.substring(startIdx, endIdx);
-                        System.out.println("✓ Successfully exchanged token via STS");
-                        System.out.println("  Access token length: " + accessToken.length());
-                        return accessToken;
+                        if (startIdx > 15 && endIdx > startIdx) {
+                            String accessToken = responseStr.substring(startIdx, endIdx);
+                            System.out.println("✓ Successfully exchanged token via STS");
+                            System.out.println("  Access token length: " + accessToken.length());
+                            System.out.println("  Access token preview: " + accessToken.substring(0, Math.min(50, accessToken.length())) + "...");
+                            return accessToken;
+                        } else {
+                            System.out.println("✗ Failed to parse access_token from STS response");
+                            return null;
+                        }
                     } else {
                         System.out.println("✗ No access_token in STS response");
                         return null;
