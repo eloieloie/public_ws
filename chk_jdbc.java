@@ -261,10 +261,27 @@ public class chk_jdbc {
             // Test Google credentials loading (if available)
             testGoogleCredentials();
             
+            // Try reading the service account token directly
+            String serviceAccountToken = readServiceAccountToken();
+            
             // Set GOOGLE_APPLICATION_CREDENTIALS environment variable for ADC
             System.setProperty("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIAL_FILE_PATH);
             
-            // Use Application Default Credentials with required OAuthType
+            // Try multiple authentication approaches
+            Connection connection = null;
+            
+            // Approach 1: Direct token usage (if we have a token)
+            if (serviceAccountToken != null && !serviceAccountToken.trim().isEmpty()) {
+                System.out.println("\n--- Approach 1: Using Kubernetes Service Account Token Directly ---");
+                connection = tryDirectTokenAuth(serviceAccountToken, driverClassLoader);
+                if (connection != null) {
+                    System.out.println("✓ Connection successful with direct token!");
+                    return connection;
+                }
+            }
+            
+            // Approach 2: ADC + OAuthType=2 (original approach)
+            System.out.println("\n--- Approach 2: ADC + OAuthType=2 ---");
             Properties props = new Properties();
             
             // Explicit ADC + required OAuthType combination
@@ -450,6 +467,149 @@ public class chk_jdbc {
         System.out.println("• Ensure token_url points to: https://sts.googleapis.com/v1/token");
         System.out.println("• Validate service_account_impersonation_url is correctly formatted");
         System.out.println("• Check the workload identity binding between KSA and GSA");
+    }
+    
+    /**
+     * Read the Kubernetes service account token directly
+     */
+    private static String readServiceAccountToken() {
+        try {
+            File tokenFile = new File(SERVICE_ACCOUNT_TOKEN_FILE);
+            if (!tokenFile.exists()) {
+                System.out.println("⚠ Service account token file not found: " + SERVICE_ACCOUNT_TOKEN_FILE);
+                return null;
+            }
+            
+            String token = new String(java.nio.file.Files.readAllBytes(tokenFile.toPath())).trim();
+            System.out.println("✓ Read service account token (" + token.length() + " characters)");
+            System.out.println("  Token preview: " + token.substring(0, Math.min(50, token.length())) + "...");
+            return token;
+            
+        } catch (Exception e) {
+            System.out.println("✗ Failed to read service account token: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Try direct token authentication using manually exchanged STS token
+     */
+    private static Connection tryDirectTokenAuth(String kubernetesToken, URLClassLoader driverClassLoader) {
+        try {
+            System.out.println("Trying STS token exchange for WIF...");
+            
+            // Step 1: Exchange Kubernetes token for Google Cloud access token via STS
+            String googleAccessToken = exchangeTokenWithSTS(kubernetesToken);
+            if (googleAccessToken == null) {
+                System.out.println("✗ STS token exchange failed");
+                return null;
+            }
+            
+            // Step 2: Use the Google access token with JDBC driver
+            System.out.println("Using exchanged Google access token with JDBC driver...");
+            Properties props = new Properties();
+            props.setProperty("OAuthType", "1"); // Bearer token method
+            props.setProperty("OAuthAccessToken", googleAccessToken); // Google access token
+            props.setProperty("LogLevel", "6");
+            props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log");
+            
+            System.out.println("  OAuthType: 1 (Bearer Token)");
+            System.out.println("  OAuthAccessToken: [GOOGLE_ACCESS_TOKEN_PROVIDED]");
+            
+            // Create the connection using our custom class loader
+            Thread.currentThread().setContextClassLoader(driverClassLoader);
+            return DriverManager.getConnection(DATABASE_URL, props);
+            
+        } catch (SQLException e) {
+            System.out.println("✗ Direct token auth failed: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.out.println("✗ Unexpected error in direct token auth: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Exchange Kubernetes service account token for Google Cloud access token via STS
+     */
+    private static String exchangeTokenWithSTS(String kubernetesToken) {
+        try {
+            System.out.println("Performing STS token exchange...");
+            
+            // STS endpoint and parameters (from your WIF credentials)
+            String stsUrl = "https://sts.googleapis.com/v1/token";
+            String audience = "//iam.googleapis.com/projects/618647108376/locations/global/workloadIdentityPools/automation/providers/aks-aks-denodo-updater-sa";
+            String scope = "https://www.googleapis.com/auth/cloud-platform";
+            
+            // Build the POST request body
+            String requestBody = "audience=" + java.net.URLEncoder.encode(audience, "UTF-8") +
+                "&grant_type=" + java.net.URLEncoder.encode("urn:ietf:params:oauth:grant-type:token-exchange", "UTF-8") +
+                "&requested_token_type=" + java.net.URLEncoder.encode("urn:ietf:params:oauth:token-type:access_token", "UTF-8") +
+                "&scope=" + java.net.URLEncoder.encode(scope, "UTF-8") +
+                "&subject_token_type=" + java.net.URLEncoder.encode("urn:ietf:params:oauth:token-type:jwt", "UTF-8") +
+                "&subject_token=" + java.net.URLEncoder.encode(kubernetesToken, "UTF-8");
+            
+            // Make the HTTP request to STS
+            java.net.URL url = new java.net.URL(stsUrl);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            conn.setDoOutput(true);
+            
+            // Send request
+            try (java.io.OutputStream os = conn.getOutputStream()) {
+                os.write(requestBody.getBytes("UTF-8"));
+            }
+            
+            // Read response
+            int responseCode = conn.getResponseCode();
+            System.out.println("  STS response code: " + responseCode);
+            
+            if (responseCode == 200) {
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                    
+                    // Parse JSON response to extract access_token
+                    String responseStr = response.toString();
+                    System.out.println("  STS response: " + responseStr.substring(0, Math.min(200, responseStr.length())) + "...");
+                    
+                    // Simple JSON parsing for access_token
+                    if (responseStr.contains("access_token")) {
+                        int startIdx = responseStr.indexOf("\"access_token\":\"") + 16;
+                        int endIdx = responseStr.indexOf("\"", startIdx);
+                        String accessToken = responseStr.substring(startIdx, endIdx);
+                        System.out.println("✓ Successfully exchanged token via STS");
+                        System.out.println("  Access token length: " + accessToken.length());
+                        return accessToken;
+                    } else {
+                        System.out.println("✗ No access_token in STS response");
+                        return null;
+                    }
+                }
+            } else {
+                // Read error response
+                try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getErrorStream(), "UTF-8"))) {
+                    StringBuilder errorResponse = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        errorResponse.append(line);
+                    }
+                    System.out.println("✗ STS token exchange failed: " + errorResponse.toString());
+                }
+                return null;
+            }
+            
+        } catch (Exception e) {
+            System.out.println("✗ STS token exchange error: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
     
     /**
