@@ -24,7 +24,7 @@ public class chk_jdbc {
      */
     
     // BigQuery connection parameters - modify these according to your setup
-    private static final String DB_URL = "jdbc:bigquery://https://private.googleapis.com/bigquery/v2:443;ProjectId=tnn-sb-to970548-1;DefaultDataset=your_dataset";
+    private static final String DB_URL = "jdbc:bigquery://https://private.googleapis.com/bigquery/v2:443;ProjectId=tnn-sb-to970548-1;DefaultDataset=bq_test_ds1";
     private static final String CREDENTIAL_FILE_PATH = "/opt/denodo/work/eloi_work/wif-credentials.json";
     private static final String SERVICE_ACCOUNT_TOKEN_FILE = "/var/run/service-account/token";
     private static final String BIGQUERY_DRIVER_PATH = "/opt/denodo/lib/extensions/jdbc-drivers-external/bigquery";
