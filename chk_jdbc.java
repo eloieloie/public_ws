@@ -303,21 +303,21 @@ public class chk_jdbc {
                 }
             }
             
-            // Approach 2: ADC + OAuthType=2 (original approach)
-            System.out.println("\n--- Approach 2: ADC + OAuthType=2 ---");
+            // Approach 2: UserAccount + OAuthType=2 (WIF requires UserAccount, not ADC!)
+            System.out.println("\n--- Approach 2: UserAccount + OAuthType=2 ---");
             Properties props = new Properties();
             
-            // Explicit ADC + required OAuthType combination
-            props.setProperty("AuthenticationType", "0"); // Application Default Credentials
+            // CRITICAL: OAuthType=2 (WIF) requires AuthenticationType=2 (UserAccount), not 0 (ADC)
+            props.setProperty("AuthenticationType", "2"); // UserAccount authentication (required for WIF!)
             props.setProperty("OAuthType", "2"); // WIF/Workload Identity Federation (required!)
             props.setProperty("LogLevel", "6"); // Enable detailed logging
             props.setProperty("LogPath", "/opt/denodo/work/eloi_work/bigquery_jdbc.log"); // Log file location
             
-            System.out.println("Connection properties (ADC=0 + OAuthType=2 explicit combination):");
-            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (Application Default Credentials)");
+            System.out.println("Connection properties (UserAccount=2 + OAuthType=2 for WIF):");
+            System.out.println("  AuthenticationType: " + props.getProperty("AuthenticationType") + " (UserAccount - REQUIRED for WIF!)");
             System.out.println("  OAuthType: " + props.getProperty("OAuthType") + " (WIF/Workload Identity Federation - REQUIRED)");
             System.out.println("  GOOGLE_APPLICATION_CREDENTIALS: " + System.getProperty("GOOGLE_APPLICATION_CREDENTIALS"));
-            System.out.println("  Note: Explicit ADC + OAuthType combination for WIF");
+            System.out.println("  Note: OAuthType=2 requires UserAccount auth, not ADC!");
             
             // Try to load BigQuery driver - we know it's the Simba driver
             try {
